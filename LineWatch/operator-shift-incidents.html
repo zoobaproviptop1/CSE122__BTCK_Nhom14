@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sự cố của tôi - LineWatch</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header id="nav"></header>
+<main class="container py-4">
+  <section class="banner mb-4">
+    <h1 class="h2">📋 Sự cố tôi đã báo</h1>
+    <p class="mb-0">Xem, sửa hoặc hủy các sự cố (chỉ sửa/hủy được khi sự cố còn ở trạng thái Mới).</p>
+  </section>
+
+  <div class="card mb-3"><div class="card-body row g-2 align-items-end">
+    <div class="col-md-6"><label class="form-label" for="search">Tìm sự cố</label><input id="search" class="form-control" placeholder="Gõ từ khóa..."></div>
+    <div class="col-md-4"><label class="form-label" for="status">Trạng thái</label>
+      <select id="status" class="form-select"><option value="">Tất cả</option><option value="new">Mới</option><option value="assigned">Đã giao</option>
+        <option value="fixing">Đang sửa</option><option value="done">Hoàn thành</option><option value="cancelled">Đã hủy</option></select></div>
+    <div class="col-md-2 d-grid"><a class="btn btn-primary" href="operator-incident-create.html">+ Báo mới</a></div>
+  </div></div>
+
+  <p id="count" class="text-muted"></p>
+  <div class="card"><div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-primary"><tr><th>Mã</th><th>Sự cố</th><th>Ưu tiên</th><th>Trạng thái</th><th>Thời gian</th><th>Thao tác</th></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div><div id="empty"></div></div>
+</main>
+
+<!-- Cửa sổ Sửa -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editTitle" aria-hidden="true"><div class="modal-dialog">
+  <form class="modal-content" id="editForm" novalidate>
+    <div class="modal-header"><h2 class="modal-title h5" id="editTitle">Sửa sự cố</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+    <div class="modal-body">
+      <label for="eTitle" class="form-label">Tiêu đề</label><input id="eTitle" class="form-control mb-2" required minlength="5"><div class="invalid-feedback">Tiêu đề phải từ 5 ký tự.</div>
+      <label for="eDesc" class="form-label">Mô tả</label><textarea id="eDesc" class="form-control mb-2" rows="3" required minlength="10"></textarea><div class="invalid-feedback">Mô tả phải từ 10 ký tự.</div>
+      <label for="ePri" class="form-label">Ưu tiên</label><select id="ePri" class="form-select"><option>Thấp</option><option>Trung bình</option><option>Cao</option></select>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary">Lưu</button></div>
+  </form>
+</div></div>
+
+<!-- Cửa sổ Hủy (bắt buộc nhập lý do) -->
+<div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelTitle" aria-hidden="true"><div class="modal-dialog">
+  <form class="modal-content" id="cancelForm" novalidate>
+    <div class="modal-header"><h2 class="modal-title h5" id="cancelTitle">Hủy sự cố</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+    <div class="modal-body">
+      <label for="reason" class="form-label">Lý do hủy *</label><textarea id="reason" class="form-control" rows="2" required></textarea>
+      <div class="invalid-feedback">Vui lòng nhập lý do hủy.</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-danger">Xác nhận hủy</button></div>
+  </form>
+</div></div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/main.js"></script>
+<script>
+  const user = initPage("operator");
+  const editModal = new bootstrap.Modal($("editModal")), cancelModal = new bootstrap.Modal($("cancelModal"));
+  let curId = null;
+
+  function render() {
+    const key = $("search").value.toLowerCase(), st = $("status").value;
+    const all = DB.get("incidents").filter(i => i.reporter === user.username);
+    const list = all.filter(i => (i.title + i.desc).toLowerCase().includes(key) && (!st || i.status === st));
+    $("count").textContent = `Hiển thị ${list.length} / ${all.length} sự cố`;
+    $("body").innerHTML = list.map(i => `<tr>
+      <td>${i.id}</td>
+      <td>${esc(i.title)}<br><small class="text-muted">${esc(machineName(i.machine))}</small></td>
+      <td>${priBadge(i.priority)}</td><td>${badge(STATUS, i.status)}</td><td>${i.time}</td>
+      <td>${i.status === "new" ? `<button class="btn btn-sm btn-outline-primary" onclick="openEdit('${i.id}')">Sửa</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="openCancel('${i.id}')">Hủy</button>` : "—"}</td></tr>`).join("");
+    $("empty").innerHTML = list.length ? "" : empty("Không có sự cố nào phù hợp.", '<a class="btn btn-primary" href="operator-incident-create.html">Báo sự cố mới</a>');
+  }
+
+  function openEdit(id) {
+    curId = id;
+    const i = DB.get("incidents").find(x => x.id === id);
+    $("eTitle").value = i.title; $("eDesc").value = i.desc; $("ePri").value = i.priority;
+    $("editForm").classList.remove("was-validated");
+    editModal.show();
+  }
+  function openCancel(id) {
+    curId = id;
+    $("reason").value = "";
+    $("cancelForm").classList.remove("was-validated");
+    cancelModal.show();
+  }
+
+  $("editForm").onsubmit = e => {
+    e.preventDefault();
+    e.target.classList.add("was-validated");
+    if (!e.target.checkValidity()) return;
+    const list = DB.get("incidents"), i = list.find(x => x.id === curId);
+    i.title = $("eTitle").value.trim(); i.desc = $("eDesc").value.trim(); i.priority = $("ePri").value;
+    DB.set("incidents", list);
+    editModal.hide(); toast("Đã cập nhật sự cố"); render();
+  };
+  $("cancelForm").onsubmit = e => {
+    e.preventDefault();
+    e.target.classList.add("was-validated");
+    if (!e.target.checkValidity()) return;
+    const list = DB.get("incidents"), i = list.find(x => x.id === curId);
+    i.status = "cancelled"; i.cause = "Hủy: " + $("reason").value.trim();
+    DB.set("incidents", list);
+    cancelModal.hide(); toast("Đã hủy sự cố", "secondary"); render();
+  };
+
+  $("search").oninput = render;
+  $("status").oninput = render;
+  render();
+</script>
+
+<footer class="app-footer"><div class="container text-center py-3"><p class="mb-0">CSE122__BTCK_Nhom14</p></div></footer>
+</body>
+</html>

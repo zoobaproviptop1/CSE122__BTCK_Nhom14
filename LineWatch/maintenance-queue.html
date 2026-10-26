@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hàng đợi bảo trì - LineWatch</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header id="nav"></header>
+<main class="container py-4">
+  <section class="banner mb-4">
+    <h1 class="h2">🔧 Hàng đợi bảo trì</h1>
+    <p class="mb-0">Sự cố được xếp theo mức ưu tiên. Bấm "Xử lý" để cập nhật và ghi nguyên nhân.</p>
+  </section>
+
+  <div class="card mb-3"><div class="card-body row g-2 align-items-end">
+    <div class="col-md-5"><label class="form-label" for="search">Tìm sự cố / máy</label><input id="search" class="form-control" placeholder="Gõ từ khóa..."></div>
+    <div class="col-md-4"><label class="form-label" for="status">Trạng thái</label>
+      <select id="status" class="form-select"><option value="">Cần xử lý (Đã giao + Đang sửa)</option><option value="assigned">Đã giao</option><option value="fixing">Đang sửa</option><option value="done">Hoàn thành</option></select></div>
+    <div class="col-md-3"><label class="form-label" for="pri">Ưu tiên</label>
+      <select id="pri" class="form-select"><option value="">Tất cả</option><option>Cao</option><option>Trung bình</option><option>Thấp</option></select></div>
+  </div></div>
+
+  <p id="count" class="text-muted"></p>
+  <div class="card"><div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-warning"><tr><th>Mã</th><th>Sự cố</th><th>Ưu tiên</th><th>Trạng thái</th><th>Thời gian</th><th></th></tr></thead>
+      <tbody id="body"></tbody>
+    </table>
+  </div><div id="empty"></div></div>
+</main>
+
+<!-- Cửa sổ chi tiết + xử lý -->
+<div class="modal fade" id="dModal" tabindex="-1" aria-labelledby="dTitle" aria-hidden="true"><div class="modal-dialog">
+  <form class="modal-content" id="dForm" novalidate>
+    <div class="modal-header"><h2 class="modal-title h5" id="dTitle">Chi tiết sự cố</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+    <div class="modal-body">
+      <div id="dInfo" class="alert alert-light border"></div>
+      <label for="dStatus" class="form-label">Trạng thái</label>
+      <select id="dStatus" class="form-select mb-2"><option value="assigned">Đã giao</option><option value="fixing">Đang sửa</option><option value="done">Hoàn thành</option></select>
+      <label for="dCause" class="form-label">Nguyên nhân (bắt buộc khi Hoàn thành)</label>
+      <textarea id="dCause" class="form-control mb-2" rows="2" minlength="5"></textarea>
+      <div class="invalid-feedback">Nhập nguyên nhân (từ 5 ký tự).</div>
+      <label for="dDown" class="form-label">Thời gian dừng máy (phút)</label>
+      <input id="dDown" type="number" min="0" max="1000" class="form-control">
+      <div class="invalid-feedback">Nhập số phút từ 0 đến 1000.</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary">Lưu</button></div>
+  </form>
+</div></div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/main.js"></script>
+<script>
+  initPage("maintenance");
+  const modal = new bootstrap.Modal($("dModal"));
+  const ORDER = { "Cao": 0, "Trung bình": 1, "Thấp": 2 };
+  let curId = null;
+
+  function render() {
+    const key = $("search").value.toLowerCase(), st = $("status").value, pri = $("pri").value;
+    const list = DB.get("incidents")
+      .filter(i => (st ? i.status === st : ["assigned", "fixing"].includes(i.status)) && (!pri || i.priority === pri)
+                   && (i.title + machineName(i.machine)).toLowerCase().includes(key))
+      .sort((a, b) => ORDER[a.priority] - ORDER[b.priority]);          // ưu tiên Cao lên đầu
+    $("count").textContent = `Có ${list.length} sự cố`;
+    $("body").innerHTML = list.map(i => `<tr><td>${i.id}</td>
+      <td>${esc(i.title)}<br><small class="text-muted">${esc(machineName(i.machine))}</small></td>
+      <td>${priBadge(i.priority)}</td><td>${badge(STATUS, i.status)}</td><td>${i.time}</td>
+      <td><button class="btn btn-sm btn-warning" onclick="openDetail('${i.id}')">Xử lý</button></td></tr>`).join("");
+    $("empty").innerHTML = list.length ? "" : empty("Không có sự cố cần xử lý. Tuyệt vời! 🎉");
+  }
+
+  function openDetail(id) {
+    curId = id;
+    const i = DB.get("incidents").find(x => x.id === id);
+    $("dInfo").innerHTML = `<b>${esc(i.title)}</b><br>Máy: ${esc(machineName(i.machine))} · Loại: ${esc(i.type)}<br>${esc(i.desc)}`;
+    $("dStatus").value = ["assigned", "fixing", "done"].includes(i.status) ? i.status : "assigned";
+    $("dCause").value = i.cause; $("dDown").value = i.downtime;
+    $("dForm").classList.remove("was-validated");
+    modal.show();
+  }
+
+  $("dForm").onsubmit = e => {
+    e.preventDefault();
+    const done = $("dStatus").value === "done";
+    $("dCause").required = done; $("dDown").required = done;           // chỉ bắt buộc khi Hoàn thành
+    e.target.classList.add("was-validated");
+    if (!e.target.checkValidity()) return;
+    const list = DB.get("incidents"), i = list.find(x => x.id === curId);
+    i.status = $("dStatus").value; i.cause = $("dCause").value.trim(); i.downtime = +$("dDown").value || 0;
+    DB.set("incidents", list);
+    modal.hide(); toast("✅ Đã cập nhật sự cố"); render();
+  };
+
+  ["search", "status", "pri"].forEach(id => $(id).oninput = render);
+  $("empty").innerHTML = spinner();
+  setTimeout(render, 500);
+</script>
+
+<footer class="app-footer"><div class="container text-center py-3"><p class="mb-0">CSE122__BTCK_Nhom14</p></div></footer>
+</body>
+</html>

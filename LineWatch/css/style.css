@@ -1,0 +1,40 @@
+/* ===== MÀU SẮC DÙNG CHUNG (đổi ở đây là đổi cả web) ===== */
+:root {
+  --main: #0d6efd;
+  --dark: #0b2e59;
+  --accent: #ff8c00;
+  --radius: 14px;
+}
+body {
+  background: linear-gradient(160deg, #eef3fb, #dbe7f8) fixed;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+main { flex: 1; }
+.navbar-lw { background: linear-gradient(90deg, var(--dark), var(--main)); }
+
+/* Banner đầu trang: ảnh nhà máy + lớp phủ xanh */
+.banner {
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 2rem;
+  background-color: var(--dark);
+  background-image: linear-gradient(rgba(11, 46, 89, .85), rgba(13, 110, 253, .55)),
+                    url("https://images.unsplash.com/photo-1565793298595-6a879b1d9492?w=1200");
+  background-size: cover;
+  background-position: center;
+}
+.hero { padding: 5rem 2rem; }
+
+.card { border: 0; border-radius: var(--radius); box-shadow: 0 3px 12px rgba(0, 0, 0, .08); }
+.card-hover { transition: transform .2s; }
+.card-hover:hover { transform: translateY(-5px); }
+
+.kpi { border-left: 6px solid var(--main); }
+.kpi .num { font-size: 2rem; font-weight: 700; color: var(--dark); }
+.step { background: #fff; border-radius: 30px; padding: .4rem 1rem; box-shadow: 0 2px 6px rgba(0, 0, 0, .1); }
+.chart-box { max-width: 380px; margin: auto; }
+
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+footer { background: var(--dark); color: #cfe0ff; }
