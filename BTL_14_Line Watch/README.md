@@ -6,7 +6,7 @@
 ---
 
 ##  Liên kết Dự án
-- **Live Deployment URL:** [https://zoobaproviptop1.github.io/CSE122__BTCK_Nhom14/](https://zoobaproviptop1.github.io/CSE122__BTCK_Nhom14/)
+- **Live Deployment URL:** [https://zoobaproviptop1.github.io/CSE122__BTCK_Nhom14/LineWatch](https://zoobaproviptop1.github.io/CSE122__BTCK_Nhom14/LineWatch)
 - **Figma / Canva Mockup Design:** [https://canva.link/z8iv2b971x7wnnu]
 - **Bảng quản lý công việc (Trello/Jira/Notion):** [https://trello.com/invite/b/6adf39c4577883e16dc64536/ATTI23129661cbb5bcff598562240a0e5a55542230A2/linewatch-cse122-btl-nhom-14]
 
