@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quản lý máy & Line - LineWatch</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header id="nav"></header>
+<main class="container py-4">
+  <section class="banner mb-4">
+    <h1 class="h2">🛠️ Quản lý máy và Line</h1>
+    <p class="mb-0">Thêm, sửa, xóa máy và dây chuyền sản xuất.</p>
+  </section>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabM">Máy</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabL">Line</button></li>
+  </ul>
+
+  <div class="tab-content">
+    <!-- Tab Máy -->
+    <div class="tab-pane fade show active" id="tabM">
+      <div class="row g-2 mb-3">
+        <div class="col-md-8"><input id="search" class="form-control" placeholder="🔍 Tìm máy..." aria-label="Tìm máy"></div>
+        <div class="col-md-4 d-grid"><button class="btn btn-primary" onclick="openM()">+ Thêm máy</button></div>
+      </div>
+      <div class="card"><div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-primary"><tr><th>Mã</th><th>Tên máy</th><th>Line</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+          <tbody id="mBody"></tbody>
+        </table>
+      </div><div id="mEmpty"></div></div>
+    </div>
+
+    <!-- Tab Line -->
+    <div class="tab-pane fade" id="tabL">
+      <form class="row g-2 mb-3" id="lForm" novalidate>
+        <div class="col-md-8"><label for="lName" class="form-label">Tên Line mới</label>
+          <input id="lName" class="form-control" required minlength="3"><div class="invalid-feedback">Tên Line phải từ 3 ký tự.</div></div>
+        <div class="col-md-4 d-grid align-self-end"><button class="btn btn-primary">+ Thêm Line</button></div>
+      </form>
+      <div class="card"><div class="table-responsive">
+        <table class="table align-middle mb-0">
+          <thead class="table-primary"><tr><th>Mã</th><th>Tên Line</th><th>Số máy</th><th></th></tr></thead>
+          <tbody id="lBody"></tbody>
+        </table>
+      </div></div>
+    </div>
+  </div>
+</main>
+
+<!-- Cửa sổ thêm/sửa máy -->
+<div class="modal fade" id="mModal" tabindex="-1" aria-labelledby="mTitle" aria-hidden="true"><div class="modal-dialog">
+  <form class="modal-content" id="mForm" novalidate>
+    <div class="modal-header"><h2 class="modal-title h5" id="mTitle">Máy</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button></div>
+    <div class="modal-body">
+      <label for="mName" class="form-label">Tên máy *</label><input id="mName" class="form-control mb-2" required minlength="3"><div class="invalid-feedback">Tên máy phải từ 3 ký tự.</div>
+      <label for="mLine" class="form-label">Line</label><select id="mLine" class="form-select mb-2"></select>
+      <label for="mStatus" class="form-label">Trạng thái</label>
+      <select id="mStatus" class="form-select"><option value="running">Đang chạy</option><option value="stopped">Dừng</option><option value="error">Lỗi</option><option value="maintenance">Bảo trì</option></select>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary">Lưu</button></div>
+  </form>
+</div></div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/main.js"></script>
+<script>
+  initPage("admin");
+  const mModal = new bootstrap.Modal($("mModal"));
+  let editId = null;
+
+  function renderMachines() {
+    const key = $("search").value.toLowerCase();
+    const list = DB.get("machines").filter(m => m.name.toLowerCase().includes(key));
+    $("mBody").innerHTML = list.map(m => `<tr><td>${m.id}</td><td>${esc(m.name)}</td><td>${esc(lineName(m.line))}</td><td>${badge(MSTATUS, m.status)}</td>
+      <td><button class="btn btn-sm btn-outline-primary" onclick="editM('${m.id}')">Sửa</button>
+          <button class="btn btn-sm btn-outline-danger" onclick="delM('${m.id}')">Xóa</button></td></tr>`).join("");
+    $("mEmpty").innerHTML = list.length ? "" : empty("Không có máy nào.");
+  }
+  function renderLines() {
+    const lines = DB.get("lines"), machines = DB.get("machines");
+    $("lBody").innerHTML = lines.map(l => `<tr><td>${l.id}</td><td>${esc(l.name)}</td><td>${machines.filter(m => m.line === l.id).length}</td>
+      <td><button class="btn btn-sm btn-outline-danger" onclick="delL('${l.id}')">Xóa</button></td></tr>`).join("");
+    $("mLine").innerHTML = lines.map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join("");
+  }
+
+  function openM() {
+    editId = null; $("mTitle").textContent = "Thêm máy";
+    $("mName").value = ""; $("mStatus").value = "running";
+    $("mForm").classList.remove("was-validated");
+    mModal.show();
+  }
+  function editM(id) {
+    const m = DB.get("machines").find(x => x.id === id);
+    editId = id; $("mTitle").textContent = "Sửa máy";
+    $("mName").value = m.name; $("mLine").value = m.line; $("mStatus").value = m.status;
+    $("mForm").classList.remove("was-validated");
+    mModal.show();
+  }
+  $("mForm").onsubmit = e => {
+    e.preventDefault();
+    e.target.classList.add("was-validated");
+    if (!e.target.checkValidity()) return;
+    const list = DB.get("machines"), name = $("mName").value.trim();
+    if (list.some(m => m.name.toLowerCase() === name.toLowerCase() && m.id !== editId)) { toast("Tên máy đã tồn tại!", "danger"); return; }   // chống trùng
+    if (editId) { Object.assign(list.find(m => m.id === editId), { name, line: $("mLine").value, status: $("mStatus").value }); }
+    else list.push({ id: DB.newId("M"), name, line: $("mLine").value, status: $("mStatus").value });
+    DB.set("machines", list);
+    mModal.hide(); toast("Đã lưu máy"); renderMachines(); renderLines();
+  };
+  function delM(id) {
+    if (!confirm("Xóa máy này?")) return;
+    DB.set("machines", DB.get("machines").filter(m => m.id !== id));
+    toast("Đã xóa máy", "secondary"); renderMachines(); renderLines();
+  }
+
+  $("lForm").onsubmit = e => {
+    e.preventDefault();
+    e.target.classList.add("was-validated");
+    if (!e.target.checkValidity()) return;
+    const lines = DB.get("lines");
+    lines.push({ id: DB.newId("L"), name: $("lName").value.trim() });
+    DB.set("lines", lines);
+    $("lForm").reset(); $("lForm").classList.remove("was-validated");
+    toast("Đã thêm Line"); renderLines();
+  };
+  function delL(id) {
+    if (DB.get("machines").some(m => m.line === id)) { toast("Line còn máy, không xóa được!", "danger"); return; }
+    if (!confirm("Xóa Line này?")) return;
+    DB.set("lines", DB.get("lines").filter(l => l.id !== id));
+    toast("Đã xóa Line", "secondary"); renderLines(); renderMachines();
+  }
+
+  $("search").oninput = renderMachines;
+  renderLines(); renderMachines();
+</script>
+
+<footer class="text-center py-3 bg-white border-top text-muted mt-auto">CSE122__BTCK_Nhom14</footer>
+</body>
+</html>
