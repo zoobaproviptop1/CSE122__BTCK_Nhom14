@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trạng thái Line - LineWatch</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header id="nav"></header>
+<main class="container py-4">
+  <section class="banner mb-4">
+    <h1 class="h2">🏭 Trạng thái dây chuyền</h1>
+    <p class="mb-0">Xem máy nào đang chạy, máy nào đang lỗi và báo sự cố ngay.</p>
+  </section>
+
+  <div class="card mb-3"><div class="card-body row g-2 align-items-end">
+    <div class="col-md-4"><label class="form-label" for="search">Tìm máy</label>
+      <input id="search" class="form-control" placeholder="Gõ tên máy..."></div>
+    <div class="col-md-3"><label class="form-label" for="lineFilter">Line</label>
+      <select id="lineFilter" class="form-select"><option value="">Tất cả Line</option></select></div>
+    <div class="col-md-3"><label class="form-label" for="statusFilter">Trạng thái</label>
+      <select id="statusFilter" class="form-select">
+        <option value="">Tất cả</option><option value="running">Đang chạy</option><option value="stopped">Dừng</option>
+        <option value="error">Lỗi</option><option value="maintenance">Bảo trì</option>
+      </select></div>
+    <div class="col-md-2 d-grid"><button class="btn btn-outline-secondary" id="resetBtn">Xóa bộ lọc</button></div>
+  </div></div>
+
+  <div id="summary" class="mb-2"></div>
+  <p id="count" class="text-muted"></p>
+  <div class="row g-3" id="list"></div>
+  <button class="btn btn-sm btn-outline-danger mt-3" id="failBtn">Giả lập lỗi tải dữ liệu (demo Error State)</button>
+</main>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/api.js"></script>
+<script src="js/main.js"></script>
+<script>
+  initPage("operator");
+  $("lineFilter").innerHTML += DB.get("lines").map(l => `<option value="${l.id}">${esc(l.name)}</option>`).join("");
+
+  // Vẽ danh sách máy theo từ khóa + 2 bộ lọc (kết hợp cùng lúc)
+  function render() {
+    const key = $("search").value.toLowerCase(), line = $("lineFilter").value, st = $("statusFilter").value;
+    const all = DB.get("machines");
+    const list = all.filter(m => m.name.toLowerCase().includes(key) && (!line || m.line === line) && (!st || m.status === st));
+    $("summary").innerHTML = Object.keys(MSTATUS).map(k => `${badge(MSTATUS, k)} ${all.filter(m => m.status === k).length}`).join(" &nbsp; ");
+    $("count").textContent = `Hiển thị ${list.length} / ${all.length} máy`;
+    $("list").innerHTML = list.length ? list.map(m => `
+      <div class="col-md-6 col-lg-4"><div class="card card-hover h-100"><div class="card-body">
+        <h5>⚙️ ${esc(m.name)}</h5>
+        <p class="text-muted mb-1">${esc(lineName(m.line))}</p>
+        ${badge(MSTATUS, m.status)}
+        <div class="mt-3"><a class="btn btn-sm btn-outline-danger" href="operator-incident-create.html?machine=${m.id}">🚨 Báo sự cố</a></div>
+      </div></div></div>`).join("")
+      : `<div class="col-12">${empty("Không tìm thấy máy phù hợp.", '<button class="btn btn-primary" onclick="resetBtn.click()">Xóa bộ lọc</button>')}</div>`;
+  }
+
+  // Tải dữ liệu: có Đang tải (spinner) và Lỗi (có nút Thử lại)
+  function load(fail) {
+    $("list").innerHTML = `<div class="col-12">${spinner()}</div>`;
+    setTimeout(() => {
+      if (fail) {
+        $("list").innerHTML = `<div class="col-12"><div class="alert alert-danger">❌ Không tải được dữ liệu máy (lỗi mạng giả lập).
+          <button class="btn btn-sm btn-danger" onclick="load(false)">Thử lại</button></div></div>`;
+        return;
+      }
+      render();
+    }, 600);
+  }
+
+  ["search", "lineFilter", "statusFilter"].forEach(id => $(id).oninput = render);
+  $("resetBtn").onclick = () => { $("search").value = ""; $("lineFilter").value = ""; $("statusFilter").value = ""; render(); };
+  $("failBtn").onclick = () => load(true);
+  load(false);
+</script>
+
+<footer class="text-center py-3 bg-white border-top text-muted mt-auto">CSE122__BTCK_Nhom14</footer>
+</body>
+</html>
